@@ -6,13 +6,45 @@ interface ConcentrationTabProps { holders: Holder[]; metrics: EntityMetrics | nu
 
 const ALERT_COLOR: Record<string,string> = { CRITICAL:'#F87171', HIGH:'#FBBF24', MEDIUM:'#818CF8', LOW:'#34D399' }
 
+// ── Custom tooltip — renders full holder name, economic %, voting %, type ────
+function HolderTooltip({
+  active, payload,
+}: {
+  active?: boolean
+  payload?: { payload?: { fullName?: string; economic?: number; voting?: number; type?: string }; value?: number; name?: string }[]
+}) {
+  if (!active || !payload?.length) return null
+  const data = payload[0]?.payload
+  if (!data) return null
+  const typeColor = data.type === 'insider' ? '#FBBF24' : data.type === 'institutional' ? '#38BDF8' : '#64748B'
+  return (
+    <div style={{ background: '#0B1117', border: '1px solid #1F2937', borderRadius: 5, padding: '10px 14px', minWidth: 200, fontSize: 12 }}>
+      <div style={{ fontWeight: 600, color: '#F1F5F9', marginBottom: 8, lineHeight: 1.4 }}>{data.fullName}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+          <span style={{ color: '#64748B' }}>Economic %</span>
+          <span style={{ fontFamily: 'Space Mono', color: '#38BDF8', fontWeight: 700 }}>{data.economic?.toFixed(1)}%</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}>
+          <span style={{ color: '#64748B' }}>Voting %</span>
+          <span style={{ fontFamily: 'Space Mono', color: '#818CF8', fontWeight: 700 }}>{data.voting?.toFixed(1)}%</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, marginTop: 4, paddingTop: 6, borderTop: '1px solid #1F2937' }}>
+          <span style={{ color: '#64748B' }}>Type</span>
+          <span style={{ fontFamily: 'Space Mono', fontSize: 10, color: typeColor }}>{data.type?.toUpperCase()}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ConcentrationTab({ holders, metrics }: ConcentrationTabProps) {
   const chartData = holders.map(h => ({
-    name: h.name.length > 18 ? h.name.slice(0, 17) + '…' : h.name,
+    name:     h.name.length > 18 ? h.name.slice(0, 17) + '…' : h.name,
     fullName: h.name,
     economic: h.economicPct,
-    voting: h.votingPct,
-    type: h.type,
+    voting:   h.votingPct,
+    type:     h.type,
   }))
 
   return (
@@ -28,7 +60,8 @@ export function ConcentrationTab({ holders, metrics }: ConcentrationTabProps) {
         }}>
           <span style={{ width:7, height:7, borderRadius:'50%', background:ALERT_COLOR[metrics.alertLevel], flexShrink:0, display:'inline-block', animation: metrics.alertLevel==='CRITICAL'?'pulse 1.2s infinite':'pulse 2s infinite' }} />
           <span>
-            <strong>CONTROL ALERT ({metrics.alertLevel}):</strong> Top 3 shareholders hold {metrics.top3Combined}% combined. HHI index = {metrics.hhi.toLocaleString()} {metrics.hhi > 2500 ? `— exceeds SEC concentration threshold of 2,500.` : `— within normal range.`}
+            <strong>CONTROL ALERT ({metrics.alertLevel}):</strong> Top 3 shareholders hold {metrics.top3Combined}% combined.
+            HHI index = {metrics.hhi.toLocaleString()} {metrics.hhi > 2500 ? '— exceeds SEC concentration threshold of 2,500.' : '— within normal range.'}
           </span>
         </div>
       )}
@@ -36,14 +69,14 @@ export function ConcentrationTab({ holders, metrics }: ConcentrationTabProps) {
       {/* Metrics row */}
       {metrics && (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:10 }}>
-          <MetricCard label="TOP 1 HOLDER" value={`${metrics.top1EconomicPct}%`} sub={metrics.top1Holder} color="cyan" />
-          <MetricCard label="HHI INDEX" value={metrics.hhi.toLocaleString()} sub={metrics.hhi>2500 ? `+${metrics.hhi-2500} vs threshold` : 'Below threshold'} color={metrics.hhi>2500?'danger':'success'} />
-          <MetricCard label="INSIDER %" value={`${metrics.insiderEconomicPct}%`} sub="Founders + Mgmt" color="warning" />
-          <MetricCard label="SHARE CLASSES" value={String(metrics.shareClasses)} sub="Distinct class types" color="indigo" />
+          <MetricCard label="TOP 1 HOLDER"   value={`${metrics.top1EconomicPct}%`}         sub={metrics.top1Holder}                                  color="cyan"    />
+          <MetricCard label="HHI INDEX"       value={metrics.hhi.toLocaleString()}           sub={metrics.hhi>2500 ? `+${metrics.hhi-2500} vs threshold` : 'Below threshold'} color={metrics.hhi>2500?'danger':'success'} />
+          <MetricCard label="INSIDER %"       value={`${metrics.insiderEconomicPct}%`}       sub="Founders + Mgmt"                                     color="warning" />
+          <MetricCard label="SHARE CLASSES"   value={String(metrics.shareClasses)}           sub="Distinct class types"                                color="indigo"  />
         </div>
       )}
 
-      {/* Bar chart */}
+      {/* Bar chart — with full custom tooltip */}
       <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:6, padding:16, flex:1 }}>
         <ChartTitle>
           Shareholder Concentration — Ownership % by Entity
@@ -52,22 +85,32 @@ export function ConcentrationTab({ holders, metrics }: ConcentrationTabProps) {
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} margin={{ top:4, right:8, left:0, bottom:40 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" vertical={false} />
-            <XAxis dataKey="name" tick={{ fill:'#64748B', fontSize:9, fontFamily:'Space Mono' }} angle={-30} textAnchor="end" interval={0} />
-            <YAxis tick={{ fill:'#64748B', fontSize:10 }} tickFormatter={v => `${v}%`} domain={[0, 35]} />
-            <Tooltip
-              contentStyle={{ background:'#0B1117', border:'1px solid #1F2937', borderRadius:4, fontSize:12 }}
-              labelStyle={{ color:'#94A3B8' }}
-              formatter={(val: number, name: string) => [`${val.toFixed(1)}%`, name === 'economic' ? 'Economic Ownership' : 'Voting Power']}
-              labelFormatter={(_: unknown, payload: {payload?: {fullName?: string}}[]) => payload?.[0]?.payload?.fullName ?? ''}
+            <XAxis
+              dataKey="name"
+              tick={{ fill:'#64748B', fontSize:9, fontFamily:'Space Mono' }}
+              angle={-30} textAnchor="end" interval={0}
             />
+            <YAxis tick={{ fill:'#64748B', fontSize:10 }} tickFormatter={v => `${v}%`} domain={[0, 35]} />
+            {/* Fixed: custom tooltip component renders full name + economic + voting + type */}
+            <Tooltip content={<HolderTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
             <Bar dataKey="economic" radius={[2,2,0,0]} name="economic">
               {chartData.map((entry, i) => (
-                <Cell key={i} fill={i===0 ? '#38BDF8' : entry.type==='insider' ? '#FBBF24' : i < 3 ? '#818CF8' : '#1F2937'} stroke={i===0?'#38BDF8':entry.type==='insider'?'#FBBF24':i<3?'#818CF8':'#374151'} strokeWidth={1} />
+                <Cell
+                  key={i}
+                  fill={i===0 ? '#38BDF8' : entry.type==='insider' ? '#FBBF24' : i < 3 ? '#818CF8' : '#1F2937'}
+                  stroke={i===0 ? '#38BDF8' : entry.type==='insider' ? '#FBBF24' : i<3 ? '#818CF8' : '#374151'}
+                  strokeWidth={1}
+                />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-        <ChartLegend items={[{ color:'#38BDF8', label:'Top Institutional' },{ color:'#818CF8', label:'Significant Holders' },{ color:'#FBBF24', label:'Insider / Founder' },{ color:'#1F2937', label:'Other' }]} />
+        <ChartLegend items={[
+          { color:'#38BDF8', label:'Top Institutional' },
+          { color:'#818CF8', label:'Significant Holders' },
+          { color:'#FBBF24', label:'Insider / Founder' },
+          { color:'#1F2937', label:'Other' },
+        ]} />
       </div>
 
       {/* Holder table */}
@@ -92,18 +135,26 @@ function HolderTable({ holders }: { holders: Holder[] }) {
         </thead>
         <tbody>
           {holders.map(h => (
-            <tr key={h.rank} style={{ borderBottom:'1px solid #0f1923' }} onMouseEnter={e => e.currentTarget.style.background='#0f1923'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+            <tr key={h.rank} style={{ borderBottom:'1px solid #0f1923' }}
+              onMouseEnter={e => e.currentTarget.style.background='#0f1923'}
+              onMouseLeave={e => e.currentTarget.style.background='transparent'}
+            >
               <td style={tdStyle} className="font-mono">{h.rank}</td>
               <td style={{ ...tdStyle, color:'var(--text-primary)', maxWidth:160, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{h.name}</td>
               <td style={tdStyle}>
-                <span style={{ padding:'2px 6px', borderRadius:3, fontSize:9, background: h.type==='insider'?'rgba(251,191,36,0.12)':h.type==='institutional'?'rgba(56,189,248,0.1)':'rgba(71,85,105,0.2)', color: h.type==='insider'?'#FBBF24':h.type==='institutional'?'#38BDF8':'#64748B', fontFamily:'Space Mono' }}>
+                <span style={{ padding:'2px 6px', borderRadius:3, fontSize:9,
+                  background: h.type==='insider'?'rgba(251,191,36,0.12)':h.type==='institutional'?'rgba(56,189,248,0.1)':'rgba(71,85,105,0.2)',
+                  color: h.type==='insider'?'#FBBF24':h.type==='institutional'?'#38BDF8':'#64748B',
+                  fontFamily:'Space Mono' }}>
                   {h.type.toUpperCase()}
                 </span>
               </td>
               <td style={{ ...tdStyle, color:'var(--cyan)', fontFamily:'Space Mono' }}>{h.economicPct.toFixed(1)}%</td>
               <td style={{ ...tdStyle, color:'var(--indigo)', fontFamily:'Space Mono' }}>{h.votingPct.toFixed(1)}%</td>
               <td style={{ ...tdStyle, color:'var(--text-muted)', fontFamily:'Space Mono' }}>{(h.shares/1e9).toFixed(1)}B</td>
-              <td style={{ ...tdStyle, color: h.changeQoQ.startsWith('+') ? 'var(--success)' : h.changeQoQ.startsWith('-') ? 'var(--danger)' : 'var(--text-muted)', fontFamily:'Space Mono' }}>{h.changeQoQ}</td>
+              <td style={{ ...tdStyle, color: h.changeQoQ.startsWith('+') ? 'var(--success)' : h.changeQoQ.startsWith('-') ? 'var(--danger)' : 'var(--text-muted)', fontFamily:'Space Mono' }}>
+                {h.changeQoQ}
+              </td>
               <td style={{ ...tdStyle, color:'var(--text-muted)' }}>{h.filingDate}</td>
             </tr>
           ))}

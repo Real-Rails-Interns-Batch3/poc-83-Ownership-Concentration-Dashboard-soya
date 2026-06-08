@@ -1,7 +1,8 @@
 'use client'
-import { Download } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
 import type { OwnershipSummary, Ticker, HolderTypeFilter } from '@/types'
 import { downloadExportJSON } from '@/lib/api'
+import { exportPdfSnapshot } from '@/lib/adapters'
 
 interface SidebarProps {
   summary: OwnershipSummary | null
@@ -128,26 +129,38 @@ export function Sidebar({ summary, ticker, holderType, onTickerChange, onHolderT
       {/* Section E */}
       <section style={sectionStyle}>
         <SectionLabel letter="E">Export</SectionLabel>
+
+        {/* JSON download */}
         <button
           onClick={downloadExportJSON}
-          style={{
-            width:'100%', padding:'10px', background:'transparent',
-            border:'1px solid var(--cyan)', borderRadius:4,
-            color:'var(--cyan)', fontSize:11,
-            fontFamily:'var(--font-space-mono)', letterSpacing:'0.06em',
-            cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-            transition:'background 0.15s'
-          }}
+          style={btnStyle('var(--cyan)')}
           onMouseEnter={e => (e.currentTarget.style.background = 'var(--cyan-dim)')}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           <Download size={13} />
           DOWNLOAD SAMPLE DATA (JSON)
         </button>
+
+        {/* PDF snapshot export */}
+        <button
+          onClick={() => exportPdfSnapshot({
+            title: 'Ownership Concentration Dashboard',
+            subtitle: `Capital Formation Rail · ${new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' })}`,
+            filename: 'real-rails-ownership-snapshot',
+          })}
+          style={{ ...btnStyle('var(--indigo)'), marginTop: 8 }}
+          onMouseEnter={e => (e.currentTarget.style.background = 'var(--indigo-dim)')}
+          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        >
+          <FileText size={13} />
+          EXPORT PDF SNAPSHOT
+        </button>
+
         <div className="font-mono" style={{ fontSize:9, color:'var(--text-muted)', marginTop:8, lineHeight:1.8 }}>
           ownership_snapshot.json<br />
           voting_rights.json<br />
-          hhi_scores.json · alerts.json
+          hhi_scores.json · alerts.json<br />
+          <span style={{ color:'var(--indigo)' }}>PDF: dashboard visual snapshot</span>
         </div>
       </section>
 
@@ -187,4 +200,15 @@ const selectStyle: React.CSSProperties = {
   width:'100%', background:'var(--surface2)', border:'1px solid var(--border)',
   borderRadius:4, color:'var(--text-primary)', fontSize:12, padding:'7px 10px',
   fontFamily:'var(--font-dm-sans)', cursor:'pointer', outline:'none'
+}
+
+function btnStyle(borderColor: string): React.CSSProperties {
+  return {
+    width:'100%', padding:'10px', background:'transparent',
+    border:`1px solid ${borderColor}`, borderRadius:4,
+    color: borderColor, fontSize:11,
+    fontFamily:'var(--font-space-mono)', letterSpacing:'0.06em',
+    cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+    transition:'background 0.15s',
+  }
 }
